@@ -1,8 +1,11 @@
 # 
-# xiSCAN - Max Aalto
+# xiSCAN - Max Aalto - Updated 8/18/2015 1:01 AM HST - Nonfunctional
 # Basic domain information scanner
+# Utilizes Eyewitness Triage Tool, written by Chris Truncer - https://github.com/ChrisTruncer/EyeWitness
+#
+#
 # Dependencies:
-# shodan, PyQt4, SIP (create pip script to download?)
+# shodan, PyQt4, SIP, pyvirtualdisplay, selenium, netaddr, fuzzywuzzy, Levenshtein, Firefox (Create pip script to download?)
 # TO DO:
 # Move into separate files and import for neater code
 # Better argument parsing
@@ -10,11 +13,27 @@
 # Combine output into single html file, to be opened upon scan completion
 # Redirect output files into a separate directory
 
-import signal, datetime, sys, os, optparse, thread, threading
-import urllib2, socket, shodan
-from PyQt4.QtGui import *
-from PyQt4.QtCore import *
-from PyQt4.QtWebKit import *
+import signal, datetime, sys, os, optparse, thread, threading, httplib
+import urllib2, socket, shodan, webbrowser, glob, shutil, time
+from modules import objects
+from modules import selenium_module
+from modules.helpers import create_folders_css
+from modules.helpers import default_creds_category
+from modules.helpers import do_jitter
+from modules.helpers import get_ua_values
+from modules.helpers import target_creator
+from modules.helpers import title_screen
+from modules.helpers import open_file_input
+from modules.helpers import resolve_host
+from modules.reporting import create_table_head
+from modules.reporting import create_web_index_head
+try:
+    from pyvirtualdisplay import Display
+    from PyQt4 import QtGui
+    from PyQt4.QtCore import QTimer
+except ImportError:
+    print "Certain dependencies not installed - please download and try again."
+    sys.exit("Exiting scanner.")
 
 # Target domain/IP
 args1 = str(sys.argv[1])
@@ -60,20 +79,37 @@ class HeadRequest(urllib2.Request):
     def get_method(self):
         return "HEAD"
     
-def pageload(r):
-    if not r:
-        print "Screenshot load error."
-        sys.exit("Exiting scanner.")
-    webpage.setViewportSize(webpage.mainFrame().contentsSize())
-    image = QImage(webpage.viewportSize(), QImage.Format_ARGB32)
-    painter = QPainter(image)
-    webpage.mainFrame().render(painter)
-    painter.end()
-    image.save("Screenshot of " + args1 + " at " + scantime.strftime("%Y-%m-%d %H:%M") + ".png")
+def eyewitnessscan(url):
+    display = None
+    create_driver = selenium_module.create_driver
+    capture_host = selenium_module.capture_host
+    http_object = objects.HTTPTableObject()
+    http_object.remote_system = url.single
+    http_object.set_paths(url.d, None)
+    date = scantime.strftime('%m/%d/%Y')
+    time = scantime.strftime('%H/%M/%S')
+    web_index_head = create_web_index_head(date, time)
+    
+    print 'Attempting to screenshot: {0}'.format(http_object.remote_system)
+    driver = create_driver(url)
+    result, driver = capture_host(url, http_object, driver)
+    result = default_creds_category(result)
+    if url.resolve:
+        result.resolved = resolve_host(result.remote_system)
+    driver.quit()
+  
+    if display is not None:
+        display.stop()
+    html = result.create_table_html()
+    with open(os.path.join(url.d, 'Screenshot scan of ' + url.single + ' at ' + scantime + '.html'), 'w') as f:
+        f.write(web_index_head)
+        f.write(create_table_head())
+        f.write(html)
+        f.write("</table><br>")
 
-def sscan(url, f):
+def headerscan(url, f):
     request = HeadRequest("http://www."+url) # Fix this argument parsing 
-    print "Taking screenshot and grabbing headers..."
+    print "Grabbing headers..."
     try: 
         response = urllib2.urlopen(request)
         response_headers = response.info()
@@ -81,10 +117,6 @@ def sscan(url, f):
     except urllib2.HTTPError, e:
         print "Error: %s." % e
         sys.exit("Exiting scanner.")
-    app = QApplication(sys.argv)
-    page = QWebPage()
-    page.connect(page, SIGNAL("loadFinished(bool)"), pageload)
-    page.mainFrame().load(QUrl(args1))
         
     
 # Simple TCP port scan with banner grabbing
@@ -112,10 +144,37 @@ def portscan(url, f):
 #        portconnection(url, port, f)
 #        port = port + 1
 	
-    
-    
+class eyewitness_args():
+    all_protocols=False
+    createtargets=None
+    cycle=None
+    d=os.getcwd()+'/reports/'
+    difference=50
+    f=None
+    h=False
+    headless=False
+    jitter=0
+    log_file_path=os.getcwd()+'/reports/'
+    no_dns=False
+    no_prompt=False
+    proxy_ip=None
+    proxy_port=None
+    rdp=False
+    resolve=False
+    results=25
+    resume=None
+    show_selenium=False
+    single=args1
+    t=7
+    threads=10
+    ua_init=False
+    user_agent=None
+    vnc=False
+    web=True
+eyewitness_namespace = eyewitness_args()
 shodan_scan(target, output)
-sscan(args1, output)
+#sscan(args1, output)
+eyewitnessscan(eyewitness_args)
 portscan(target, output)
 
 
