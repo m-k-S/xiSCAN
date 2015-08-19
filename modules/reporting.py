@@ -1,4 +1,4 @@
-pimport os
+import os
 import sys
 
 try:

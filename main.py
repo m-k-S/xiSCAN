@@ -1,5 +1,5 @@
 # 
-# xiSCAN - Max Aalto - Updated 8/18/2015 1:01 AM HST - Nonfunctional
+# xiSCAN - Max Aalto - Updated 8/19/2015 at 1:43 AM HST
 # Basic domain information scanner
 # Utilizes Eyewitness Triage Tool, written by Chris Truncer - https://github.com/ChrisTruncer/EyeWitness
 #
