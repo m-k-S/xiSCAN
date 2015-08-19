@@ -5,16 +5,18 @@
 #
 #
 # Dependencies:
-# shodan, PyQt4, SIP, pyvirtualdisplay, selenium, netaddr, fuzzywuzzy, Levenshtein, Firefox (Create pip script to download?)
+# shodan, PyQt4, SIP, pyvirtualdisplay, selenium, netaddr, fuzzywuzzy, Levenshtein, Firefox, python-nmap (Create pip script to download?)
 # TO DO:
 # Move into separate files and import for neater code
 # Better argument parsing
-# Account for domain DNS distribution
+# Utilize Shodan DNS resolving
+# Shodan API Key as input
+# Iterate port scan over all discovered hosts
 # Combine output into single html file, to be opened upon scan completion
 # Redirect output files into a separate directory
 
 import signal, datetime, sys, os, optparse, thread, threading, httplib
-import urllib2, socket, shodan, webbrowser, glob, shutil, time
+import urllib2, socket, webbrowser, glob, shutil, time
 from modules import objects
 from modules import selenium_module
 from modules.helpers import create_folders_css
@@ -31,21 +33,32 @@ try:
     from pyvirtualdisplay import Display
     from PyQt4 import QtGui
     from PyQt4.QtCore import QTimer
+    import shodan
+    import nmap
 except ImportError:
     print "Certain dependencies not installed - please download and try again."
     sys.exit("Exiting scanner.")
 
+print "-------------------------------------------------------------------"
+print "|                            xiSCAN 0.4                           |"
+print "-------------------------------------------------------------------"
+    
 # Target domain/IP
-args1 = str(sys.argv[1])
-target = socket.gethostbyname(args1)
+try:
+    args1 = str(sys.argv[1])
+    target = socket.gethostbyname(args1)
+except socket.gaierror, e:
+    print "Invalid domain."
+    sys.exit("Exiting scanner.")
+
+
 
 # Grabbing local time and using it to organize output files
 scantime = datetime.datetime.now()
 filename = "Scan on " + args1 + " at " + scantime.strftime("%Y-%m-%d %H:%M") + ".txt"
 
-print "--------------------------------------------------------------------"
 print "Scanning " + args1 + " at " + scantime.strftime("%Y-%m-%d %H:%M") + "."
-print "--------------------------------------------------------------------"
+print "-------------------------------------------------------------------"
 
 # Writing output file
 output = open(filename, 'w+')
@@ -55,11 +68,19 @@ def shodan_scan(url, f):
     print "Pulling info from shodan.io..."
     # Shodan API 
     SHODAN_API_KEY = "NHEtA05p8soXE9vZ0wrI2y0R3u6YE3RN"
+    # In final version, use an input function (SHODAN_API_KEY = input("Enter Shodan API Key:"))
     api = shodan.Shodan(SHODAN_API_KEY)
+    
+    # DNS Resolving (finding all IPs associated with a domain) - unsure if this is possible within Shodan
+    #dnsResolve = 'https://api.shodan.io/dns/resolve?hostnames=' + args1 *change this* + '&key=' + SHODAN_API_KEY
+    #res = requests.get(dnsResolve)
+    #hostIPs = resolved.json()[target]
+    
     try:
         host = api.host(url)
     except shodan.APIError, e:
-        print "Error: %s." % e
+        print "Shodan Error: %s." % e
+        sys.exit("Exiting scanner.")
         
     # Parsing and writing info from Shodan scan
     f.write('[DOMAIN INFO]\n')
@@ -70,7 +91,6 @@ def shodan_scan(url, f):
     f.write('Country: '+host.get('country_name', 'n/a')+'\n')
     f.write('City: '+host.get('city', 'n/a')+'\n')
     f.write('AS#: '+host.get('asn', 'n/a')+'\n\n\n')
-    #f.write('Ports: '+str(host.get('ports', 'n/a'))+'\n')
     
     
 
@@ -80,6 +100,7 @@ class HeadRequest(urllib2.Request):
         return "HEAD"
     
 def eyewitnessscan(url):
+    # Iterate this over all the IPs given by the Shodan scan
     display = None
     create_driver = selenium_module.create_driver
     capture_host = selenium_module.capture_host
@@ -90,7 +111,7 @@ def eyewitnessscan(url):
     time = scantime.strftime('%H/%M/%S')
     web_index_head = create_web_index_head(date, time)
     
-    print 'Attempting to screenshot: {0}'.format(http_object.remote_system)
+    print 'Attempting to screenshot: {0}...'.format(http_object.remote_system)
     driver = create_driver(url)
     result, driver = capture_host(url, http_object, driver)
     result = default_creds_category(result)
@@ -101,7 +122,7 @@ def eyewitnessscan(url):
     if display is not None:
         display.stop()
     html = result.create_table_html()
-    with open(os.path.join(url.d, 'Screenshot scan of ' + url.single + ' at ' + scantime + '.html'), 'w') as f:
+    with open(os.path.join(url.d, 'Screenshot scan of ' + url.single + ' at ' + scantime.strftime("%Y-%m-%d %H:%M") + '.html'), 'w') as f:
         f.write(web_index_head)
         f.write(create_table_head())
         f.write(html)
@@ -119,30 +140,17 @@ def headerscan(url, f):
         sys.exit("Exiting scanner.")
         
     
-# Simple TCP port scan with banner grabbing
-def portconnection(url, p, f):
-    print "Scanning ports..."
-    try:
-        connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        connection.connect((url, p))
-        f.write("[TCP]\nPort %d: Open\n" % p)
-        connection.send("hi\r\n".encode("utf-8"))
-        
-        b = connection.recv(100).decode("utf-8").strip("\n")
-        f.write("[BANNER]\n" + b + '\n\n\n')
-        connection.shutdown(socket.SHUT_RDWR)
-        connection.close()
-    except Exception, e:
-        print "Error: %s." % e
-        sys.exit("Exiting scanner.")
-
+# Simple TCP port scan using python-nmap
 def portscan(url, f):
-    port = 80
-    portconnection(url, port, f)
-# Fix port scan loop - timeout error?? Could be my computer.
-#    while port < 64445:
-#        portconnection(url, port, f)
-#        port = port + 1
+    print "Scanning TCP ports 1 through 1080..."
+    nm = nmap.PortScanner()
+    nm.scan(url, '1-1080')
+    lport = nm[url]['tcp'].keys()
+    lport.sort()
+    f.write('[PORTS]\n')
+    for port in lport:
+        f.write('Port: %s\tState : %s\n' % (port, nm[url]['tcp'][port]['state']))
+
 	
 class eyewitness_args():
     all_protocols=False
@@ -171,9 +179,10 @@ class eyewitness_args():
     user_agent=None
     vnc=False
     web=True
+    
 eyewitness_namespace = eyewitness_args()
 shodan_scan(target, output)
-#sscan(args1, output)
+headerscan(args1, output)
 eyewitnessscan(eyewitness_args)
 portscan(target, output)
 
@@ -181,14 +190,6 @@ portscan(target, output)
 endscantime = datetime.datetime.now()
 totaltime = endscantime - scantime 
 print "Scan completed in " + str(totaltime) + "."
+print "Exiting scanner."
     
     
-# Storing all banners from Shodan *Unnecessary*
-#banners = []
-#for item in host['data']:
-#     banners.append("""
-#                       Port: %s
-#                      Banner: %s
-#
-#                    """ % (item['port'], item['data']))
-

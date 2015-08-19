@@ -1,11 +1,10 @@
-import os
+pimport os
 import sys
 
 try:
     from fuzzywuzzy import fuzz
 except ImportError:
-    print '[*] fuzzywuzzy not found.'
-    print '[*] Please run the script in the setup directory!'
+    print 'Module fuzzywuzzy not found - please install.'
     sys.exit()
 
 
