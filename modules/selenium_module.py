@@ -126,7 +126,7 @@ def capture_host(cli_parsed, http_object, driver, ua=None):
             driver.get(http_object.remote_system)
         except TimeoutException:
             # Another timeout results in an error state and a return
-            print 'Hit timeout limit when connecting to {0}'.format(http_object.remote_system)
+            print 'Hit timeout limit when connecting to {0}.\n'.format(http_object.remote_system)
             http_object.error_state = 'Timeout'
             http_object.page_title = 'Timeout Limit Reached'
             http_object.headers = {}

@@ -1,19 +1,12 @@
 # 
-# xiSCAN - Max Aalto - Updated 8/19/2015 at 1:43 AM HST
+# xiSCAN - Max Aalto - Updated 8/20/2015 at 1:07 AM HST
 # Basic domain information scanner
 # Utilizes Eyewitness Triage Tool, written by Chris Truncer - https://github.com/ChrisTruncer/EyeWitness
 #
 #
 # Dependencies:
 # shodan, PyQt4, SIP, pyvirtualdisplay, selenium, netaddr, fuzzywuzzy, Levenshtein, Firefox, python-nmap 
-#
-#
-# TO DO:
-# Shodan API Key as input
-# Iterate header and screenshot scans
-# argparse function to create proper domain string
-# Combine output into single html file, to be opened upon scan completion
-# Redirect output files into a separate directory
+
 
 import signal, datetime, sys, os, optparse, thread, threading, httplib
 import urllib2, socket, webbrowser, glob, shutil, time, string
@@ -40,7 +33,7 @@ except ImportError:
     sys.exit("Exiting scanner.")
 
 print "-------------------------------------------------------------------"
-print "|                            xiSCAN 0.4                           |"
+print "|                            xiSCAN 0.7                           |"
 print "-------------------------------------------------------------------"
     
 # Target domain/IP
@@ -56,15 +49,18 @@ except socket.gaierror, e:
 # Grabbing local time and using it to organize output files
 scantime = datetime.datetime.now()
 filename = "Scan on " + args1 + " at " + scantime.strftime("%Y-%m-%d %H:%M") + ".txt"
+dirname = "Scan on " + args1 + " at " + scantime.strftime("%Y-%m-%d %H:%M")
+
+# Writing output directory
+os.makedirs(os.getcwd()+'/reports/'+dirname)
 
 print "Scanning " + args1 + " at " + scantime.strftime("%Y-%m-%d %H:%M") + "."
 print "-------------------------------------------------------------------\n"
 
-# Writing output file
-output = open(filename, 'w+')
-# Asking for Shodan API key
-# API_KEY = raw_input("Enter Shodan API Key: ")
-API_KEY = "NHEtA05p8soXE9vZ0wrI2y0R3u6YE3RN" 
+# Writing output file for basic info, host list and port information
+output = open(os.path.join(os.getcwd()+'/reports/'+dirname, filename), 'w+')
+
+API_KEY = raw_input("Enter Shodan API Key: ")
 
 host_ip_list = []
 
@@ -115,13 +111,10 @@ def shodan_scan(url, f, SHODAN_API_KEY):
 
     
 
-# Screenshot scan with server header info
-class HeadRequest(urllib2.Request):
-    def get_method(self):
-        return "HEAD"
-    
+# Screenshot scan using Eyewitness Triage Tool
+
+
 def eyewitnessscan(url):
-    # Iterate this over all the IPs given by the Shodan scan
     display = None
     create_driver = selenium_module.create_driver
     capture_host = selenium_module.capture_host
@@ -132,33 +125,42 @@ def eyewitnessscan(url):
     time = scantime.strftime('%H/%M/%S')
     web_index_head = create_web_index_head(date, time)
     
+    
     print 'Attempting to screenshot: {0}...\n'.format(http_object.remote_system)
-    driver = create_driver(url)
-    result, driver = capture_host(url, http_object, driver)
-    result = default_creds_category(result)
-    if url.resolve:
-        result.resolved = resolve_host(result.remote_system)
-    driver.quit()
+    try:
+        driver = create_driver(url)
+        result, driver = capture_host(url, http_object, driver)
+        result = default_creds_category(result)
+        if url.resolve:
+            result.resolved = resolve_host(result.remote_system)
+        driver.quit()
   
-    if display is not None:
-        display.stop()
-    html = result.create_table_html()
-    with open(os.path.join(url.d, 'Screenshot scan of ' + url.single + ' at ' + scantime.strftime("%Y-%m-%d %H:%M") + '.html'), 'w') as f:
-        f.write(web_index_head)
-        f.write(create_table_head())
-        f.write(html)
-        f.write("</table><br>")
+        if display is not None:
+            display.stop()
+        html = result.create_table_html()
+        with open(os.path.join(url.d+dirname, 'Screenshot scan of ' + url.single + ' at ' + scantime.strftime("%Y-%m-%d %H:%M") + '.html'), 'w') as f:
+            f.write(web_index_head)
+            f.write(create_table_head())
+            f.write(html)
+            f.write("</table><br>")
+    except Exception:
+        print 'Unable to scan: {0}.\n'.format(http_object.remote_system)
 
-def headerscan(url, f):
-    request = HeadRequest("http://www."+url) # Fix this argument parsing 
-    print "Grabbing headers...\n"
-    try: 
-        response = urllib2.urlopen(request)
-        response_headers = response.info()
-        f.write("[HEADER]\n"+str(response_headers)+'\n\n\n')
-    except urllib2.HTTPError, e:
-        print "Error: %s." % e
-        sys.exit("Exiting scanner.")
+# Deprecated function - Eyewitness performs similar task
+#class HeadRequest(urllib2.Request):
+#    def get_method(self):
+#        return "HEAD"
+
+#def headerscan(url, f):
+#    request = HeadRequest("http://www."+url)  
+#    print "Grabbing headers...\n"
+#    try: 
+#        response = urllib2.urlopen(request)
+#        response_headers = response.info()
+#        f.write("[HEADER]\n"+str(response_headers)+'\n\n\n')
+#    except urllib2.HTTPError, e:
+#        print "Error: %s." % e
+#        sys.exit("Exiting scanner.")
         
     
 # Simple TCP port scan using python-nmap
@@ -205,8 +207,10 @@ class eyewitness_args():
 eyewitness_namespace = eyewitness_args()
 basic_info(target, output, API_KEY)
 shodan_scan(args1, output, API_KEY)
-headerscan(args1, output)
-eyewitnessscan(eyewitness_args)
+eyewitnessscan(eyewitness_namespace)
+for host_ip in host_ip_list:
+    eyewitness_args.single = host_ip
+    eyewitnessscan(eyewitness_namespace)
 for host_ip in host_ip_list:
     print 'Scanning TCP ports 1 through 1080 on %s...' % host_ip 
     output.write('TCP ports open on %s:\n' % host_ip)
@@ -214,9 +218,14 @@ for host_ip in host_ip_list:
     output.write('\n\n')
 
 
+
 endscantime = datetime.datetime.now()
 totaltime = endscantime - scantime 
 print "Scan completed in " + str(totaltime) + "."
-print "Exiting scanner."
+print "Exiting scanner and opening scan results."
+
+frontend = webbrowser.get()
+frontend.open(os.path.join(os.getcwd()+'/reports/'+dirname, filename))
+
     
     
