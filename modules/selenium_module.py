@@ -18,7 +18,7 @@ try:
     from selenium.common.exceptions import UnexpectedAlertPresentException
     from selenium.common.exceptions import WebDriverException
 except ImportError:
-    print '[*] Selenium not found.'
+    print 'Selenium not found.'
     sys.exit()
 
 
@@ -94,20 +94,20 @@ def capture_host(cli_parsed, http_object, driver, ua=None):
     try:
         driver.get(http_object.remote_system)
     except KeyboardInterrupt:
-        print '[*] Skipping: {0}'.format(http_object.remote_system)
+        print 'Skipping: {0}'.format(http_object.remote_system)
         http_object.error_state = 'Skipped'
         http_object.page_title = 'Page Skipped by User'
     except TimeoutException:
-        print '[*] Hit timeout limit when connecting to {0}, retrying'.format(http_object.remote_system)
+        print 'Hit timeout limit when connecting to {0}, retrying.'.format(http_object.remote_system)
         driver.quit()
         driver = create_driver(cli_parsed, ua)
         http_object.error_state = 'Timeout'
     except httplib.BadStatusLine:
-        print '[*] Bad status line when connecting to {0}'.format(http_object.remote_system)
+        print 'Bad status line when connecting to {0}'.format(http_object.remote_system)
         http_object.error_state = 'BadStatus'
         return http_object, driver
     except WebDriverException:
-        print '[*] WebDriverError when connecting to {0}'.format(http_object.remote_system)
+        print 'WebDriverError when connecting to {0}'.format(http_object.remote_system)
         http_object.error_state = 'BadStatus'
         return http_object, driver
 
@@ -126,7 +126,7 @@ def capture_host(cli_parsed, http_object, driver, ua=None):
             driver.get(http_object.remote_system)
         except TimeoutException:
             # Another timeout results in an error state and a return
-            print '[*] Hit timeout limit when connecting to {0}'.format(http_object.remote_system)
+            print 'Hit timeout limit when connecting to {0}'.format(http_object.remote_system)
             http_object.error_state = 'Timeout'
             http_object.page_title = 'Timeout Limit Reached'
             http_object.headers = {}
@@ -134,15 +134,15 @@ def capture_host(cli_parsed, http_object, driver, ua=None):
             driver = create_driver(cli_parsed, ua)
             return http_object, driver
         except KeyboardInterrupt:
-            print '[*] Skipping: {0}'.format(http_object.remote_system)
+            print 'Skipping: {0}'.format(http_object.remote_system)
             http_object.error_state = 'Skipped'
             http_object.page_title = 'Page Skipped by User'
         except httplib.BadStatusLine:
-            print '[*] Bad status line when connecting to {0}'.format(http_object.remote_system)
+            print 'Bad status line when connecting to {0}'.format(http_object.remote_system)
             http_object.error_state = 'BadStatus'
             return http_object, driver
         except WebDriverException:
-            print '[*] WebDriverError when connecting to {0}'.format(http_object.remote_system)
+            print 'WebDriverError when connecting to {0}'.format(http_object.remote_system)
             http_object.error_state = 'BadStatus'
             return http_object, driver
 
@@ -155,7 +155,7 @@ def capture_host(cli_parsed, http_object, driver, ua=None):
     try:
         driver.save_screenshot(http_object.screenshot_path)
     except WebDriverException as e:
-        print('[*] Error saving web page screenshot'
+        print('Error saving web page screenshot'
               ' for ' + http_object.remote_system)
     
 

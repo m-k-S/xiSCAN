@@ -5,18 +5,18 @@
 #
 #
 # Dependencies:
-# shodan, PyQt4, SIP, pyvirtualdisplay, selenium, netaddr, fuzzywuzzy, Levenshtein, Firefox, python-nmap (Create pip script to download?)
+# shodan, PyQt4, SIP, pyvirtualdisplay, selenium, netaddr, fuzzywuzzy, Levenshtein, Firefox, python-nmap 
+#
+#
 # TO DO:
-# Move into separate files and import for neater code
-# Better argument parsing
-# Utilize Shodan DNS resolving
 # Shodan API Key as input
-# Iterate port scan over all discovered hosts
+# Iterate header and screenshot scans
+# argparse function to create proper domain string
 # Combine output into single html file, to be opened upon scan completion
 # Redirect output files into a separate directory
 
 import signal, datetime, sys, os, optparse, thread, threading, httplib
-import urllib2, socket, webbrowser, glob, shutil, time
+import urllib2, socket, webbrowser, glob, shutil, time, string
 from modules import objects
 from modules import selenium_module
 from modules.helpers import create_folders_css
@@ -58,23 +58,20 @@ scantime = datetime.datetime.now()
 filename = "Scan on " + args1 + " at " + scantime.strftime("%Y-%m-%d %H:%M") + ".txt"
 
 print "Scanning " + args1 + " at " + scantime.strftime("%Y-%m-%d %H:%M") + "."
-print "-------------------------------------------------------------------"
+print "-------------------------------------------------------------------\n"
 
 # Writing output file
 output = open(filename, 'w+')
+# Asking for Shodan API key
+# API_KEY = raw_input("Enter Shodan API Key: ")
+API_KEY = "NHEtA05p8soXE9vZ0wrI2y0R3u6YE3RN" 
 
-def shodan_scan(url, f):
+host_ip_list = []
+
+def basic_info(url, f, SHODAN_API_KEY):
     
-    print "Pulling info from shodan.io..."
-    # Shodan API 
-    SHODAN_API_KEY = "NHEtA05p8soXE9vZ0wrI2y0R3u6YE3RN"
-    # In final version, use an input function (SHODAN_API_KEY = input("Enter Shodan API Key:"))
+    print "Pulling info from shodan.io...\n"
     api = shodan.Shodan(SHODAN_API_KEY)
-    
-    # DNS Resolving (finding all IPs associated with a domain) - unsure if this is possible within Shodan
-    #dnsResolve = 'https://api.shodan.io/dns/resolve?hostnames=' + args1 *change this* + '&key=' + SHODAN_API_KEY
-    #res = requests.get(dnsResolve)
-    #hostIPs = resolved.json()[target]
     
     try:
         host = api.host(url)
@@ -82,16 +79,40 @@ def shodan_scan(url, f):
         print "Shodan Error: %s." % e
         sys.exit("Exiting scanner.")
         
-    # Parsing and writing info from Shodan scan
     f.write('[DOMAIN INFO]\n')
     f.write('Organization: '+host.get('org', 'n/a')+'\n')
     f.write('ISP: '+host.get('isp', 'n/a')+'\n')
     f.write('Operating System: '+str(host.get('os', 'n/a'))+'\n')
     f.write('Coordinates: '+str(host.get('latitude', 'n/a')) + ' N, ' + str(host.get('longitude', 'n/a')) + ' E\n')
-    f.write('Country: '+host.get('country_name', 'n/a')+'\n')
-    f.write('City: '+host.get('city', 'n/a')+'\n')
+    if not host.get('country_name', 'n/a') is None:
+        f.write('Country: '+host.get('country_name', 'n/a')+'\n')
+    if not host.get('city', 'n/a') is None:
+        f.write('City: '+host.get('city', 'n/a')+'\n')
     f.write('AS#: '+host.get('asn', 'n/a')+'\n\n\n')
     
+
+def shodan_scan(url, f, SHODAN_API_KEY):
+    
+    print "Resolving host IPs using Shodan..."
+    api = shodan.Shodan(SHODAN_API_KEY)
+    
+    try:
+        hostIPs = api.search(url, facets='domain:'+string.split(url,'.')[0])
+    except shodan.APIError, e:
+        print "Shodan Error: %s." % e
+        sys.exit("Exiting scanner.")
+    
+    f.write('[HOST IPs]\n')
+    global host_ip_list
+    
+    
+    for IP in hostIPs['matches']:
+        host_ip_list.append(IP['ip_str'])
+        f.write('IP: %s\n' % IP['ip_str'])
+    f.write('\n\n\n')
+    print '%s hosts found.\n' % len(host_ip_list)
+
+
     
 
 # Screenshot scan with server header info
@@ -111,7 +132,7 @@ def eyewitnessscan(url):
     time = scantime.strftime('%H/%M/%S')
     web_index_head = create_web_index_head(date, time)
     
-    print 'Attempting to screenshot: {0}...'.format(http_object.remote_system)
+    print 'Attempting to screenshot: {0}...\n'.format(http_object.remote_system)
     driver = create_driver(url)
     result, driver = capture_host(url, http_object, driver)
     result = default_creds_category(result)
@@ -130,7 +151,7 @@ def eyewitnessscan(url):
 
 def headerscan(url, f):
     request = HeadRequest("http://www."+url) # Fix this argument parsing 
-    print "Grabbing headers..."
+    print "Grabbing headers...\n"
     try: 
         response = urllib2.urlopen(request)
         response_headers = response.info()
@@ -142,15 +163,16 @@ def headerscan(url, f):
     
 # Simple TCP port scan using python-nmap
 def portscan(url, f):
-    print "Scanning TCP ports 1 through 1080..."
     nm = nmap.PortScanner()
     nm.scan(url, '1-1080')
-    lport = nm[url]['tcp'].keys()
-    lport.sort()
-    f.write('[PORTS]\n')
-    for port in lport:
-        f.write('Port: %s\tState : %s\n' % (port, nm[url]['tcp'][port]['state']))
-
+    try:
+        lport = nm[url]['tcp'].keys()
+        lport.sort()
+        for port in lport:
+            f.write('Port: %s\tState : %s\n' % (port, nm[url]['tcp'][port]['state']))
+    except KeyError, e:
+        print "Error while scanning %s." % e
+    
 	
 class eyewitness_args():
     all_protocols=False
@@ -181,10 +203,15 @@ class eyewitness_args():
     web=True
     
 eyewitness_namespace = eyewitness_args()
-shodan_scan(target, output)
+basic_info(target, output, API_KEY)
+shodan_scan(args1, output, API_KEY)
 headerscan(args1, output)
 eyewitnessscan(eyewitness_args)
-portscan(target, output)
+for host_ip in host_ip_list:
+    print 'Scanning TCP ports 1 through 1080 on %s...' % host_ip 
+    output.write('TCP ports open on %s:\n' % host_ip)
+    portscan(host_ip, output)
+    output.write('\n\n')
 
 
 endscantime = datetime.datetime.now()
