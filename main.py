@@ -9,7 +9,7 @@
 
 
 import signal, datetime, sys, os, optparse, thread, threading, httplib
-import urllib2, socket, webbrowser, glob, shutil, time, string
+import urllib2, socket, webbrowser, glob, shutil, time, string, argparse
 from modules import objects
 from modules import selenium_module
 from modules.helpers import create_folders_css
@@ -35,10 +35,17 @@ except ImportError:
 print "-------------------------------------------------------------------"
 print "|                            xiSCAN 0.7                           |"
 print "-------------------------------------------------------------------"
-    
+
+# Argument parsing
+parser = argparse.ArgumentParser(usage="xiSCAN - Max Aalto (@m-k-S)\n $ python main.py <domain> <opts>")
+parser.add_argument('domain', help='Scan input - enter domain name and top level domain here (ie: google.com)', dest='input', action='store')
+parser.add_argument('-b', help='Open results in PyQt4-based browser UI', dest='frontend', action='store_true', default=False)
+parser.add_argument('-e', help='Encrypts output directory with domain name as key', dest='encrypt', action='store_true', default=False)
+opts = parser.parse_args()
+
 # Target domain/IP
+args1 = opts.input
 try:
-    args1 = str(sys.argv[1])
     target = socket.gethostbyname(args1)
 except socket.gaierror, e:
     print "Invalid domain."
@@ -113,8 +120,9 @@ def shodan_scan(url, f, SHODAN_API_KEY):
 
 # Screenshot scan using Eyewitness Triage Tool
 
+scroutput = open(os.path.join(os.getcwd()+'/reports/'+dirname, 'Screenshot scan of ' + args1 + ' at ' + scantime.strftime("%Y-%m-%d %H:%M") + '.html'), 'w+')
 
-def eyewitnessscan(url):
+def eyewitnessscan(url, f):
     display = None
     create_driver = selenium_module.create_driver
     capture_host = selenium_module.capture_host
@@ -131,18 +139,15 @@ def eyewitnessscan(url):
         driver = create_driver(url)
         result, driver = capture_host(url, http_object, driver)
         result = default_creds_category(result)
-        if url.resolve:
-            result.resolved = resolve_host(result.remote_system)
         driver.quit()
   
         if display is not None:
             display.stop()
         html = result.create_table_html()
-        with open(os.path.join(url.d+dirname, 'Screenshot scan of ' + url.single + ' at ' + scantime.strftime("%Y-%m-%d %H:%M") + '.html'), 'w') as f:
-            f.write(web_index_head)
-            f.write(create_table_head())
-            f.write(html)
-            f.write("</table><br>")
+        f.write(web_index_head)
+        f.write(create_table_head())
+        f.write(html)
+            
     except Exception:
         print 'Unable to scan: {0}.\n'.format(http_object.remote_system)
 
@@ -207,10 +212,11 @@ class eyewitness_args():
 eyewitness_namespace = eyewitness_args()
 basic_info(target, output, API_KEY)
 shodan_scan(args1, output, API_KEY)
-eyewitnessscan(eyewitness_namespace)
+eyewitnessscan(eyewitness_namespace, scroutput)
 for host_ip in host_ip_list:
     eyewitness_args.single = host_ip
-    eyewitnessscan(eyewitness_namespace)
+    eyewitnessscan(eyewitness_namespace, scroutput)
+scroutput.write("</table><br>")
 for host_ip in host_ip_list:
     print 'Scanning TCP ports 1 through 1080 on %s...' % host_ip 
     output.write('TCP ports open on %s:\n' % host_ip)
@@ -224,8 +230,9 @@ totaltime = endscantime - scantime
 print "Scan completed in " + str(totaltime) + "."
 print "Exiting scanner and opening scan results."
 
-frontend = webbrowser.get()
-frontend.open(os.path.join(os.getcwd()+'/reports/'+dirname, filename))
+#if opts.frontend is True:
+    #frontend = webbrowser.get()
+    #frontend.open(os.path.join(os.getcwd()+'/reports/'+dirname, filename))
 
     
     
