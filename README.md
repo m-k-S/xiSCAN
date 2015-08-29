@@ -25,6 +25,6 @@ To run xiSCAN, one must first install:
   6. fuzzywuzzy
   7. py-Levenshtein
   8. Firefox/Iceweasel
-  9. python-nmap
+  9. python-nmap 0.1.4
 
 I recommend installing pip first as all of these modules are easily downloaded via pip.
