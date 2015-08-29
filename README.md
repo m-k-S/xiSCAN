@@ -1,7 +1,5 @@
-# xiSCAN - Max Aalto
-Domain fingerprinting tool
-
-Designed to run on Kali Linux
+# xiSCAN - Domain fingerprinting tool
+# Designed to run on Kali Linux
 
 SETUP:
 
