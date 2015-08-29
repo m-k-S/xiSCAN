@@ -1,5 +1,5 @@
 # xiSCAN - Domain fingerprinting tool
-# Designed to run on Kali Linux
+ Designed to run on Kali Linux
 
 SETUP:
 
