@@ -1,5 +1,5 @@
 # 
-# xiSCAN - m-k-S - Updated 8/20/2015 at 1:07 AM HST
+# xiSCAN - Max Aalto - Updated 8/20/2015 at 1:07 AM HST
 # Basic domain information scanner
 # Utilizes Eyewitness Triage Tool, written by Chris Truncer - https://github.com/ChrisTruncer/EyeWitness
 #
@@ -37,14 +37,14 @@ print "|                            xiSCAN 0.7                           |"
 print "-------------------------------------------------------------------"
 
 # Argument parsing
-parser = argparse.ArgumentParser(usage="xiSCAN - (@m-k-S)\n $ python main.py <domain> <opts>")
-parser.add_argument('domain', help='Scan input - enter domain name and top level domain here (ie: google.com)', dest='input', action='store')
+parser = argparse.ArgumentParser(usage="xiSCAN - Max Aalto (@m-k-S)\n $ python main.py <domain> <opts>")
+parser.add_argument('domain', help='Scan input - enter domain name and top level domain here (ie: google.com)', action='store')
 parser.add_argument('-b', help='Open results in PyQt4-based browser UI', dest='frontend', action='store_true', default=False)
 parser.add_argument('-e', help='Encrypts output directory with domain name as key', dest='encrypt', action='store_true', default=False)
 opts = parser.parse_args()
 
 # Target domain/IP
-args1 = opts.input
+args1 = opts.domain
 try:
     target = socket.gethostbyname(args1)
 except socket.gaierror, e:
