@@ -8,7 +8,7 @@ SETUP:
 
 USAGE: 
 
-python main.py <domain name>
+python main.py \<domain name\>
 
   Note that argument parsing functionality is very limited - domain name must be given as one subdomain of one
   top-level domain (ie: google.com). xiSCAN should pull all subdomains of a scanned domain via Shodan for more
